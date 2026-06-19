@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Türkçe Yorum Puan Sınıflandırıcı</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; max-width: 860px; margin: 0 auto;
+         padding: 24px; background: #0f172a; color: #e2e8f0; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.1rem; margin-top: 32px; border-bottom: 1px solid #334155; padding-bottom: 6px; }
+  textarea { width: 100%; background: #1e293b; color: #e2e8f0; border: 1px solid #334155;
+             border-radius: 8px; padding: 10px; font-size: 0.95rem; }
+  button { background: #3b82f6; color: #fff; border: 0; border-radius: 8px;
+           padding: 10px 18px; font-size: 0.95rem; cursor: pointer; margin-top: 8px; }
+  button:hover { background: #2563eb; }
+  .stars { font-size: 1.6rem; letter-spacing: 2px; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+          padding: 16px; margin-top: 12px; }
+  .bar { height: 10px; background: #334155; border-radius: 5px; overflow: hidden; margin: 2px 0; }
+  .bar > span { display: block; height: 100%; background: #3b82f6; }
+  .row { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+  .row .lbl { width: 28px; }
+  .muted { color: #94a3b8; font-size: 0.85rem; }
+  .flag-inflated { color: #f87171; font-weight: 600; }
+  .flag-deflated { color: #fbbf24; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 8px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #334155; }
+  .big { font-size: 2rem; font-weight: 700; }
+  .add-row { display: flex; gap: 12px; align-items: stretch; }
+  .add-row textarea { flex: 1; }
+  .add-side { display: flex; flex-direction: column; gap: 6px; min-width: 170px; }
+  .add-side button { margin-top: auto; }
+  .starpick { font-size: 1.5rem; letter-spacing: 3px; user-select: none; }
+  .starpick span.s { cursor: pointer; }
+  .star-on { color: #fbbf24; }
+  .star-off { color: #475569; }
+  .rlist { list-style: none; padding: 0; margin: 14px 0 0; }
+  .rlist li { display: flex; align-items: center; gap: 10px; background: #1e293b;
+              border: 1px solid #334155; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
+  .rlist .rstar { color: #fbbf24; white-space: nowrap; min-width: 92px; }
+  .rlist .rtext { flex: 1; font-size: 0.9rem; }
+  .rlist .rm { color: #f87171; cursor: pointer; background: none; padding: 2px 8px; margin: 0; }
+  .rlist .rm:hover { background: #334155; }
+  button.secondary { background: #475569; }
+  button.secondary:hover { background: #64748b; }
+  button:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+</style>
+</head>
+<body>
+  <h1>⭐ Türkçe Yorum Puan Sınıflandırıcı</h1>
+  <p class="muted">Yorum metninden 1–5 yıldız tahmini. Sahte puan (olumsuz metne yüksek yıldız) tespiti.</p>
+
+  <h2>Tek Yorum</h2>
+  <textarea id="single" rows="3" placeholder="Örn: Ürün berbat çıktı, kesinlikle tavsiye etmem.">Ürün berbat çıktı, parası boşa gitti kesinlikle almayın.</textarea>
+  <br><button onclick="predictOne()">Tahmin Et</button>
+  <div id="singleOut"></div>
+
+  <h2>Yorum Listesi → Gerçek Ortalama</h2>
+  <p class="muted">Yorum yaz, sağdan yıldızını seç ve <b>Yorum Ekle</b> ile listeye ekle. İstediğin kadar yorum ekleyebilirsin. Yıldız sahte-puan tespiti içindir (opsiyonel).</p>
+
+  <div class="card">
+    <div class="add-row">
+      <textarea id="newText" rows="2" placeholder="Yorum metni..."></textarea>
+      <div class="add-side">
+        <div class="muted">Verilen yıldız (opsiyonel)</div>
+        <div id="starPick" class="starpick"></div>
+        <button onclick="addReview()">+ Yorum Ekle</button>
+      </div>
+    </div>
+  </div>
+
+  <ul id="reviewList" class="rlist"></ul>
+
+  <button id="calcBtn" onclick="aggregate()" disabled>Ortalamayı Hesapla</button>
+  <button class="secondary" onclick="clearAll()">Listeyi Temizle</button>
+  <div id="batchOut"></div>
+
+<script>
+const STAR = n => "★".repeat(n) + "☆".repeat(5 - n);
+
+async function post(url, body) {
+  const r = await fetch(url, { method: "POST", headers: {"Content-Type": "application/json"},
+                              body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function predictOne() {
+  const text = document.getElementById("single").value.trim();
+  const out = document.getElementById("singleOut");
+  if (!text) return;
+  out.innerHTML = "<p class='muted'>...</p>";
+  try {
+    const d = await post("/predict", { text });
+    let bars = "";
+    for (let s = 1; s <= 5; s++) {
+      const p = (d.probabilities[s] || 0) * 100;
+      bars += `<div class="row"><span class="lbl">${s}★</span>
+        <div class="bar" style="flex:1"><span style="width:${p}%"></span></div>
+        <span>${p.toFixed(1)}%</span></div>`;
+    }
+    out.innerHTML = `<div class="card">
+      <div class="stars">${STAR(d.predicted_rating)}</div>
+      <div class="muted">Tahmin: ${d.predicted_rating}★ · güven ${(d.confidence*100).toFixed(1)}%</div>
+      ${bars}</div>`;
+  } catch (e) { out.innerHTML = `<p style="color:#f87171">Hata: ${e.message}</p>`; }
+}
+
+// ── Yorum listesi durumu ──────────────────────────────
+let reviews = [];      // {text, rating: 1-5 | null}
+let pickRating = 0;    // ekleme formundaki seçili yıldız (0 = puansız)
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+function renderStarPick() {
+  let h = "";
+  for (let s = 1; s <= 5; s++)
+    h += `<span class="s ${s <= pickRating ? 'star-on' : 'star-off'}" onclick="setPick(${s})">★</span>`;
+  h += ` <span class="muted" style="font-size:.75rem;cursor:pointer" onclick="setPick(0)">temizle</span>`;
+  document.getElementById("starPick").innerHTML = h;
+}
+function setPick(s) { pickRating = s; renderStarPick(); }
+
+function addReview() {
+  const ta = document.getElementById("newText");
+  const text = ta.value.trim();
+  if (!text) return;
+  reviews.push({ text, rating: pickRating || null });
+  ta.value = ""; pickRating = 0;
+  renderStarPick(); renderList(); ta.focus();
+}
+function removeReview(i) { reviews.splice(i, 1); renderList(); }
+function clearAll() {
+  reviews = []; renderList();
+  document.getElementById("batchOut").innerHTML = "";
+}
+function renderList() {
+  document.getElementById("reviewList").innerHTML = reviews.map((r, i) => `<li>
+    <span class="rstar">${r.rating ? STAR(r.rating) : '<span class="muted">puansız</span>'}</span>
+    <span class="rtext">${escapeHtml(r.text)}</span>
+    <button class="rm" onclick="removeReview(${i})">✕</button></li>`).join("");
+  document.getElementById("calcBtn").disabled = reviews.length === 0;
+}
+
+async function aggregate() {
+  if (reviews.length === 0) return;
+  const payload = reviews.map(r => r.rating ? { text: r.text, given_rating: r.rating } : { text: r.text });
+  const out = document.getElementById("batchOut");
+  out.innerHTML = "<p class='muted'>...</p>";
+  try {
+    const d = await post("/aggregate", { reviews: payload, include_details: true });
+    let dist = "";
+    for (let s = 1; s <= 5; s++) dist += `${s}★:${d.rating_distribution[s]}  `;
+    let rows = d.details.map(x => `<tr>
+      <td>${escapeHtml(x.text)}</td>
+      <td>${x.given_rating ?? "-"}</td>
+      <td>${x.predicted_rating}★</td>
+      <td class="${x.mismatch ? 'flag-'+x.mismatch : ''}">${x.mismatch ?? ""}</td></tr>`).join("");
+    out.innerHTML = `<div class="card">
+      <div class="row" style="gap:32px">
+        <div><div class="muted">Metin-tabanlı gerçek ortalama</div>
+             <div class="big">${d.predicted_avg.toFixed(2)}★</div></div>
+        <div><div class="muted">Verilen ortalama</div>
+             <div class="big">${d.given_avg != null ? d.given_avg.toFixed(2)+"★" : "-"}</div></div>
+        <div><div class="muted">Şüpheli yorum</div>
+             <div class="big" style="color:#f87171">${d.suspicious_count}</div></div>
+      </div>
+      <div class="muted" style="margin-top:8px">Dağılım: ${dist}</div>
+      <table><tr><th>Yorum</th><th>Verilen</th><th>Tahmin</th><th>Durum</th></tr>${rows}</table>
+    </div>`;
+  } catch (e) { out.innerHTML = `<p style="color:#f87171">Hata: ${e.message}</p>`; }
+}
+
+// ── Başlangıç: örnek yorumlar + yıldız seçici ─────────
+reviews = [
+  { text: "Harika ürün çok memnunum, herkese tavsiye ederim.", rating: 5 },
+  { text: "Berbat, kargo geç geldi ürün bozuk çıktı.", rating: 5 },
+  { text: "Fena değil ama fiyatına göre idare eder.", rating: 3 },
+];
+renderStarPick();
+renderList();
+</script>
+</body>
+</html>
