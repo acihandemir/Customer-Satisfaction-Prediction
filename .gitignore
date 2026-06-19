@@ -1,0 +1,11 @@
+# Büyük BERTurk modeli — GitHub 100 MB/dosya sınırını aşar (Colab'dan indirilir)
+uygulama/models/berturk_model/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Geçici / üretilen
+_img_tmp/
+*.tmp
