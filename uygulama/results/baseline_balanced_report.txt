@@ -1,0 +1,33 @@
+MODEL: models/baseline_balanced.joblib
+Test seti: 47,202 yorum (dedup'lı, leakage-safe, random_state=42)
+
+=== ÖZET METRİKLER ===
+  Accuracy (exact) : 0.6056  (60.56%)
+  +-1 Accuracy     : 0.8761  (87.61%)
+  MAE              : 0.5552 yıldız
+  Macro-F1         : 0.4091
+
+  Gerçek ortalama puan      : 4.370
+  Tahmin ortalama (argmax)  : 4.330
+  Tahmin ortalama (E-değer) : 4.053  <- gerçeğe en yakın
+
+=== CLASSIFICATION REPORT ===
+              precision    recall  f1-score   support
+
+          1*      0.379     0.619     0.470      1220
+          2*      0.168     0.330     0.223      1166
+          3*      0.249     0.235     0.242      5116
+          4*      0.423     0.271     0.331     11109
+          5*      0.750     0.812     0.780     28591
+
+    accuracy                          0.606     47202
+   macro avg      0.394     0.454     0.409     47202
+weighted avg      0.595     0.606     0.594     47202
+
+=== CONFUSION MATRIX (satır=gerçek, sütun=tahmin) ===
+              1*      2*      3*      4*      5*
+   1*       755     194     122      27     122
+   2*       283     385     255     121     122
+   3*       384     737   1,201   1,005   1,789
+   4*       210     556   1,621   3,016   5,706
+   5*       361     416   1,620   2,965  23,229
